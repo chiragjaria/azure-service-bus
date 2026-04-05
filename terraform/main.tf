@@ -18,7 +18,7 @@ data "azurerm_resource_group" "rg" {
 
 data "azurerm_storage_account" "sa" {
   name                = var.storage_account_name
-  resource_group_name = data.azurerm_resource_group.rg.name
+  resource_group_name = data.azurerm_resource_group.rg2.name
 }
 
 data "azurerm_key_vault" "kv" {
