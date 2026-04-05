@@ -30,7 +30,7 @@ data "azurerm_key_vault" "kv" {
 # ═══════════════════════════════════════════════════════════════
 # SERVICE BUS NAMESPACE (container for queues & topics)
 # ═══════════════════════════════════════════════════════════════
-data "azurerm_servicebus_namespace" "sb" {
+resource "azurerm_servicebus_namespace" "sb" {
   name                = var.servicebus_namespace_name
   resource_group_name = data.azurerm_resource_group.rg.name
   location            = data.azurerm_resource_group.rg.location
@@ -40,9 +40,9 @@ data "azurerm_servicebus_namespace" "sb" {
 # ═══════════════════════════════════════════════════════════════
 # SERVICE BUS QUEUE (one sender → one receiver)
 # ═══════════════════════════════════════════════════════════════
-data "azurerm_servicebus_queue" "orders" {
+resource "azurerm_servicebus_queue" "orders" {
   name         = var.queue_name
-  namespace_id = data.azurerm_servicebus_namespace.sb.id
+  namespace_id = azurerm_servicebus_namespace.sb.id
 
   # Message handling rules
   max_delivery_count                         = 10        # retry 10 times
@@ -56,7 +56,7 @@ data "azurerm_servicebus_queue" "orders" {
 # ═══════════════════════════════════════════════════════════════
 resource "azurerm_key_vault_secret" "sb_connection" {
   name         = "sb-connection-string"
-  value        = data.azurerm_servicebus_namespace.sb.default_primary_connection_string
+  value        = azurerm_servicebus_namespace.sb.default_primary_connection_string
   key_vault_id = data.azurerm_key_vault.kv.id
 }
 
