@@ -59,11 +59,6 @@ stages:
         command: plan
         workingDirectory: $(workingDir)
         environmentServiceNameAzureRM: $(serviceConnection)
-        commandOptions: |
-          -var="resource_group_name=$(resourceGroup)"
-          -var="location=$(location)"
-          -var="servicebus_namespace_name=$(serviceBusNamespace)"
-          -var="queue_name=$(queueName)"
 
     # Terraform Apply
     - task: TerraformTaskV4@4
@@ -73,12 +68,7 @@ stages:
         command: apply
         workingDirectory: $(workingDir)
         environmentServiceNameAzureRM: $(serviceConnection)
-        commandOptions: |
-          -var="resource_group_name=$(resourceGroup)"
-          -var="location=$(location)"
-          -var="servicebus_namespace_name=$(serviceBusNamespace)"
-          -var="queue_name=$(queueName)"
-          -auto-approve
+        commandOptions: '-auto-approve'
 
 # ================= VERIFY =================
 - stage: Verify
