@@ -16,7 +16,7 @@ pool:
 
 variables:
   # Azure & Subscription
-  AZURE_SUBSCRIPTION: '0f5cddc1-2c9e-4eaf-a1b4-ced017f2d729'          # ← Change this
+  AZURE_SUBSCRIPTION: 'Azure subscription 1'          # ← Change this
   RESOURCE_GROUP: 'rgp-dev-mes'
   LOCATION: 'Central India'
   
