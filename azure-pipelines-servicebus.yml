@@ -6,7 +6,7 @@ pool:
 
 variables:
   terraformVersion: '1.7.0'
-  workingDir: '$(System.DefaultWorkingDirectory)/azure-service-bus/terraform'
+  workingDir: '$(System.DefaultWorkingDirectory)/terraform'
 
   # Azure
   serviceConnection: 'azure-service-connection'
