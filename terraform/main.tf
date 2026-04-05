@@ -56,7 +56,7 @@ data "azurerm_servicebus_queue" "orders" {
 # ═══════════════════════════════════════════════════════════════
 resource "azurerm_key_vault_secret" "sb_connection" {
   name         = "sb-connection-string"
-  value        = azurerm_servicebus_namespace.sb.default_primary_connection_string
+  value        = data.azurerm_servicebus_namespace.sb.default_primary_connection_string
   key_vault_id = data.azurerm_key_vault.kv.id
 }
 
