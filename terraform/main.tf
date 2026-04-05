@@ -47,7 +47,7 @@ resource "azurerm_servicebus_queue" "orders" {
   max_delivery_count                         = 10        # retry 10 times
   lock_duration                              = "PT1M"    # lock for 1 min while processing
   default_message_ttl                        = "P14D"    # message lives 14 days
-  enable_dead_lettering_on_message_expiration = true     # failed → dead-letter queue
+  #enable_dead_lettering_on_message_expiration = true     # failed → dead-letter queue
 }
 
 # ═══════════════════════════════════════════════════════════════
