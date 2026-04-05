@@ -1,1 +1,8 @@
-
+resource_group_name       = "rgp-dev-mes"
+location                  = "Central India"
+servicebus_namespace_name = "sb-mes-dev-cj"
+queue_name                = "orders-queue"
+key_vault_name            = "kvmesdev123"
+function_app_name         = "func-sb-dev-cj"
+storage_account_name      = "tddevtfstate123"
+resource_group_name_storage= "rgp-tddev-de-ci-dat-01"
