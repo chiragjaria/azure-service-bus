@@ -60,9 +60,9 @@ stages:
         workingDirectory: $(workingDir)
         environmentServiceNameAzureRM: $(serviceConnection)
         commandOptions: |
-          -var="resource_group_name=$(resourceGroup)" \
-          -var="location=$(location)" \
-          -var="servicebus_namespace_name=$(serviceBusNamespace)" \
+          -var="resource_group_name=$(resourceGroup)"
+          -var="location=$(location)"
+          -var="servicebus_namespace_name=$(serviceBusNamespace)"
           -var="queue_name=$(queueName)"
 
     # Terraform Apply
@@ -74,10 +74,10 @@ stages:
         workingDirectory: $(workingDir)
         environmentServiceNameAzureRM: $(serviceConnection)
         commandOptions: |
-          -var="resource_group_name=$(resourceGroup)" \
-          -var="location=$(location)" \
-          -var="servicebus_namespace_name=$(serviceBusNamespace)" \
-          -var="queue_name=$(queueName)" \
+          -var="resource_group_name=$(resourceGroup)"
+          -var="location=$(location)"
+          -var="servicebus_namespace_name=$(serviceBusNamespace)"
+          -var="queue_name=$(queueName)"
           -auto-approve
 
 # ================= VERIFY =================
