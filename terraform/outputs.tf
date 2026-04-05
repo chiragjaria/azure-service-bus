@@ -1,6 +1,6 @@
 output "servicebus_namespace" {
   description = "Service Bus namespace name"
-  value       = azurerm_servicebus_namespace.sb.name
+  value       = data.azurerm_servicebus_namespace.sb.name
 }
 
 output "queue_name" {
