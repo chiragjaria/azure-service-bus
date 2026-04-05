@@ -1,0 +1,252 @@
+# Azure Pipelines - Service Bus Provisioning with Terraform
+# Triggers: Manual or on main branch push
+# Environment: Development
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - azure-service-bus/terraform/**
+      - azure-pipelines-servicebus.yml
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  # Azure & Subscription
+  AZURE_SUBSCRIPTION: '0f5cddc1-2c9e-4eaf-a1b4-ced017f2d729'          # ← Change this
+  RESOURCE_GROUP: 'rgp-dev-mes'
+  LOCATION: 'Central India'
+  
+  # Terraform
+  TERRAFORM_VERSION: '1.5.0'
+  TF_ROOT: '$(System.DefaultWorkingDirectory)/azure-service-bus/terraform'
+  
+  # Service Bus specifics
+  SERVICEBUS_NAMESPACE: 'sb-mes-dev-cj'
+  QUEUE_NAME: 'orders-queue'
+  
+  # Function App
+  FUNCTION_APP_NAME: 'func-sb-dev-cj'
+  STORAGE_ACCOUNT: 'stmesdev123'
+  KEY_VAULT_NAME: 'kvmesdev123'
+  
+  # Terraform State Backend
+  TERRAFORM_BACKEND_RG: 'rgp-dev-mes'
+  TERRAFORM_BACKEND_SA: 'tfstatemesdev'           # ← Change if different
+  TERRAFORM_BACKEND_CONTAINER: 'tfstate'
+  TERRAFORM_BACKEND_KEY: 'servicebus.tfstate'
+
+stages:
+
+# ═══════════════════════════════════════════════════════════════
+# STAGE 1: INIT & VALIDATE
+# ═══════════════════════════════════════════════════════════════
+- stage: Init_Validate
+  displayName: 'Initialize & Validate Terraform'
+  
+  jobs:
+  - job: TerraformInit
+    displayName: 'Terraform Init'
+    
+    steps:
+    
+    # Step 1: Checkout code
+    - checkout: self
+      displayName: 'Checkout Repository'
+    
+    # Step 2: Install Terraform
+    - task: TerraformInstaller@0
+      displayName: 'Install Terraform $(TERRAFORM_VERSION)'
+      inputs:
+        terraformVersion: '$(TERRAFORM_VERSION)'
+    
+    # Step 3: Azure CLI login
+    - task: AzureCLI@2
+      displayName: 'Azure CLI Login'
+      inputs:
+        azureSubscription: '$(AZURE_SUBSCRIPTION)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az account show
+          echo "✅ Authenticated with Azure"
+    
+    # Step 4: Initialize Terraform with backend
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Init with Backend'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(TF_ROOT)'
+        backendServiceArm: '$(AZURE_SUBSCRIPTION)'
+        backendAzureRmResourceGroupName: '$(TERRAFORM_BACKEND_RG)'
+        backendAzureRmStorageAccountName: '$(TERRAFORM_BACKEND_SA)'
+        backendAzureRmContainerName: '$(TERRAFORM_BACKEND_CONTAINER)'
+        backendAzureRmKey: '$(TERRAFORM_BACKEND_KEY)'
+    
+    # Step 5: Validate Terraform syntax
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Validate'
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(TF_ROOT)'
+
+# ═══════════════════════════════════════════════════════════════
+# STAGE 2: PLAN
+# ═══════════════════════════════════════════════════════════════
+- stage: Plan
+  displayName: 'Terraform Plan'
+  dependsOn: Init_Validate
+  
+  jobs:
+  - job: TerraformPlan
+    displayName: 'Generate Terraform Plan'
+    
+    steps:
+    
+    - checkout: self
+    
+    - task: TerraformInstaller@0
+      displayName: 'Install Terraform'
+      inputs:
+        terraformVersion: '$(TERRAFORM_VERSION)'
+    
+    - task: AzureCLI@2
+      displayName: 'Azure CLI Login'
+      inputs:
+        azureSubscription: '$(AZURE_SUBSCRIPTION)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: 'az account show'
+    
+    # Initialize again for plan
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Init'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(TF_ROOT)'
+        backendServiceArm: '$(AZURE_SUBSCRIPTION)'
+        backendAzureRmResourceGroupName: '$(TERRAFORM_BACKEND_RG)'
+        backendAzureRmStorageAccountName: '$(TERRAFORM_BACKEND_SA)'
+        backendAzureRmContainerName: '$(TERRAFORM_BACKEND_CONTAINER)'
+        backendAzureRmKey: '$(TERRAFORM_BACKEND_KEY)'
+    
+    # Generate plan
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Plan'
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(TF_ROOT)'
+        commandOptions: |
+          -var="resource_group_name=$(RESOURCE_GROUP)" \
+          -var="location=$(LOCATION)" \
+          -var="servicebus_namespace_name=$(SERVICEBUS_NAMESPACE)" \
+          -var="queue_name=$(QUEUE_NAME)" \
+          -var="key_vault_name=$(KEY_VAULT_NAME)" \
+          -var="function_app_name=$(FUNCTION_APP_NAME)" \
+          -var="storage_account_name=$(STORAGE_ACCOUNT)" \
+          -out=tfplan
+        environmentServiceNameAzureRM: '$(AZURE_SUBSCRIPTION)'
+    
+    # Save plan as artifact
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Terraform Plan'
+      inputs:
+        pathToPublish: '$(TF_ROOT)'
+        artifactName: 'terraform-plan'
+        publishLocation: 'Container'
+
+# ═══════════════════════════════════════════════════════════════
+# STAGE 3: APPLY (Manual approval required)
+# ═══════════════════════════════════════════════════════════════
+- stage: Apply
+  displayName: 'Terraform Apply (⚠️ Manual Approval Required)'
+  dependsOn: Plan
+  condition: succeeded()
+  
+  jobs:
+  - deployment: TerraformApply
+    displayName: 'Apply Terraform Changes'
+    environment: 'Production'
+    
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          
+          - checkout: self
+          
+          - task: TerraformInstaller@0
+            displayName: 'Install Terraform'
+            inputs:
+              terraformVersion: '$(TERRAFORM_VERSION)'
+          
+          - task: AzureCLI@2
+            displayName: 'Azure CLI Login'
+            inputs:
+              azureSubscription: '$(AZURE_SUBSCRIPTION)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: 'az account show'
+          
+          - task: DownloadBuildArtifacts@0
+            displayName: 'Download Terraform Plan'
+            inputs:
+              artifactName: 'terraform-plan'
+              downloadPath: '$(System.DefaultWorkingDirectory)'
+          
+          # Initialize for apply
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Init'
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(TF_ROOT)'
+              backendServiceArm: '$(AZURE_SUBSCRIPTION)'
+              backendAzureRmResourceGroupName: '$(TERRAFORM_BACKEND_RG)'
+              backendAzureRmStorageAccountName: '$(TERRAFORM_BACKEND_SA)'
+              backendAzureRmContainerName: '$(TERRAFORM_BACKEND_CONTAINER)'
+              backendAzureRmKey: '$(TERRAFORM_BACKEND_KEY)'
+          
+          # Apply the plan
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Apply'
+            inputs:
+              provider: 'azurerm'
+              command: 'apply'
+              workingDirectory: '$(TF_ROOT)'
+              commandOptions: |
+                -var="resource_group_name=$(RESOURCE_GROUP)" \
+                -var="location=$(LOCATION)" \
+                -var="servicebus_namespace_name=$(SERVICEBUS_NAMESPACE)" \
+                -var="queue_name=$(QUEUE_NAME)" \
+                -var="key_vault_name=$(KEY_VAULT_NAME)" \
+                -var="function_app_name=$(FUNCTION_APP_NAME)" \
+                -var="storage_account_name=$(STORAGE_ACCOUNT)" \
+                -auto-approve
+              environmentServiceNameAzureRM: '$(AZURE_SUBSCRIPTION)'
+          
+          # Get outputs
+          - task: AzureCLI@2
+            displayName: 'Get Terraform Outputs'
+            inputs:
+              azureSubscription: '$(AZURE_SUBSCRIPTION)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              workingDirectory: '$(TF_ROOT)'
+              inlineScript: |
+                echo "════════════════════════════════════════════"
+                echo "✅ SERVICE BUS PROVISIONED SUCCESSFULLY"
+                echo "════════════════════════════════════════════"
+                terraform output -no-color
+                echo ""
+                echo "Service Bus Namespace: $(SERVICEBUS_NAMESPACE)"
+                echo "Queue: $(QUEUE_NAME)"
+                echo "Function App: $(FUNCTION_APP_NAME)"
+                echo "Region: $(LOCATION)"
