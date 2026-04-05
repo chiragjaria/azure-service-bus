@@ -32,3 +32,8 @@ variable "storage_account_name" {
   description = "Storage account name"
   type        = string
 }
+
+variable "resource_group_name_storage" {
+  description = "Storage account name"
+  type        = string
+}
