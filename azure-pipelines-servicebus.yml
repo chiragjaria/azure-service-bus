@@ -18,7 +18,7 @@ variables:
   queueName: 'orders-queue'
 
   # Backend
-  backendStorageAccount: 'tfstatemesdev'
+  backendStorageAccount: 'tddevtfstate123'
   backendContainer: 'tfstate'
   backendKey: 'servicebus.terraform.tfstate'
 
@@ -33,7 +33,7 @@ stages:
     steps:
 
     # Install Terraform
-    - task: TerraformInstaller@0
+    - task: TerraformInstaller@1
       displayName: Install Terraform
       inputs:
         terraformVersion: $(terraformVersion)
