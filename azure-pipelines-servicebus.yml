@@ -20,7 +20,7 @@ variables:
   backendKey: 'servicebus.terraform.tfstate'
   # Function App
   functionAppName: 'func-sb-dev-cj'
-  functionAppPath: '$(System.DefaultWorkingDirectory)/azure-service-bus'
+  functionAppPath: '$(System.DefaultWorkingDirectory)/azure-service-bus/*'
   keyVaultName: 'kvmesdev123'
   pythonVersion: '3.10'
 
@@ -274,7 +274,7 @@ stages:
           
           # Check OrderSender
           echo "Checking OrderSender..."
-          if [ -f "OrderSender/function_app.py" ] && [ -f "OrderSender/function.json" ] && [ -f "OrderSender/requirements.txt" ]; then
+          if [ -f "OrderSender/function_app.py" ] && [ -f "OrderSender/requirements.txt" ]; then
             echo "✅ OrderSender: All files present"
           else
             echo "❌ OrderSender: Missing files"
@@ -283,7 +283,7 @@ stages:
           
           # Check OrderProcessor
           echo "Checking OrderProcessor..."
-          if [ -f "OrderProcessor/function_app.py" ] && [ -f "OrderProcessor/function.json" ] && [ -f "OrderProcessor/requirements.txt" ]; then
+          if [ -f "OrderProcessor/function_app.py" ] && [ -f "OrderProcessor/requirements.txt" ]; then
             echo "✅ OrderProcessor: All files present"
           else
             echo "❌ OrderProcessor: Missing files"
