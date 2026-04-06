@@ -45,12 +45,16 @@ stages:
           ls -la $(Build.ArtifactStagingDirectory)/package
 
     # Install dependencies INTO package (CRITICAL FIX)
+    
     - task: Bash@3
       displayName: 'Install dependencies inside package'
       inputs:
         targetType: 'inline'
         script: |
           cd $(Build.ArtifactStagingDirectory)/package
+
+          echo "Creating directory..."
+          mkdir -p .python_packages/lib/site-packages
 
           echo "Installing dependencies into .python_packages..."
           pip install -r requirements.txt --target=".python_packages/lib/site-packages"
