@@ -1,1 +1,13 @@
-
+{
+  "scriptFile": "function_app.py",
+  "bindings": [
+    {
+      "type": "serviceBusTrigger",
+      "direction": "in",
+      "name": "msg",
+      "queueName": "orders-queue",
+      "connection": "SB_CONNECTION_STRING",
+      "cardinality": "one"
+    }
+  ]
+}
