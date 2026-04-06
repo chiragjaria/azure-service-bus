@@ -20,7 +20,7 @@ variables:
   backendKey: 'servicebus.terraform.tfstate'
   # Function App
   functionAppName: 'func-sb-dev-cj'
-  functionAppPath: '$(System.DefaultWorkingDirectory)'
+  functionAppPath: '$(System.DefaultWorkingDirectory)'    # ✅ FIXED: repo root is the function app root
   keyVaultName: 'kvmesdev123'
   pythonVersion: '3.10'
 
@@ -39,13 +39,11 @@ stages:
     - checkout: self
       displayName: 'Checkout Repository'
     
-    # Install Terraform
     - task: TerraformInstaller@1
       displayName: Install Terraform $(terraformVersion)
       inputs:
         terraformVersion: $(terraformVersion)
     
-    # Terraform Init
     - task: TerraformTaskV4@4
       displayName: 'Terraform Init - Initialize Backend'
       inputs:
@@ -58,7 +56,6 @@ stages:
         backendAzureRmContainerName: $(backendContainer)
         backendAzureRmKey: $(backendKey)
     
-    # Terraform Validate
     - task: TerraformTaskV4@4
       displayName: 'Terraform Validate - Check Syntax'
       inputs:
@@ -66,7 +63,6 @@ stages:
         command: validate
         workingDirectory: $(workingDir)
     
-    # Terraform Plan
     - task: TerraformTaskV4@4
       displayName: 'Terraform Plan - Show Changes'
       inputs:
@@ -75,7 +71,6 @@ stages:
         workingDirectory: $(workingDir)
         environmentServiceNameAzureRM: $(serviceConnection)
     
-    # Terraform Apply
     - task: TerraformTaskV4@4
       displayName: 'Terraform Apply - Create Resources'
       inputs:
@@ -85,7 +80,6 @@ stages:
         environmentServiceNameAzureRM: $(serviceConnection)
         commandOptions: '-auto-approve'
     
-    # Display Terraform Outputs
     - task: AzureCLI@2
       displayName: 'Display Terraform Outputs'
       inputs:
@@ -119,7 +113,6 @@ stages:
     - checkout: self
       displayName: 'Checkout Repository'
     
-    # Verify Service Bus Namespace
     - task: AzureCLI@2
       displayName: 'Verify Service Bus Namespace'
       inputs:
@@ -137,7 +130,6 @@ stages:
             -o table
           echo "✅ Service Bus Namespace verified"
     
-    # Verify Queue
     - task: AzureCLI@2
       displayName: 'Verify Service Bus Queue'
       inputs:
@@ -156,7 +148,6 @@ stages:
             -o table
           echo "✅ Queue verified"
     
-    # Verify Function App
     - task: AzureCLI@2
       displayName: 'Verify Function App'
       inputs:
@@ -174,7 +165,6 @@ stages:
             -o table
           echo "✅ Function App verified"
     
-    # Verify Key Vault
     - task: AzureCLI@2
       displayName: 'Verify Key Vault Secrets'
       inputs:
@@ -207,16 +197,13 @@ stages:
     
     - checkout: self
       displayName: 'Checkout Repository'
-      path: 's/azure-service-bus'
     
-    # Setup Python
     - task: UsePythonVersion@0
       displayName: 'Setup Python $(pythonVersion)'
       inputs:
         versionSpec: '$(pythonVersion)'
         addToPath: true
     
-    # Install Dependencies
     - task: Bash@3
       displayName: 'Install Python Dependencies'
       inputs:
@@ -232,7 +219,6 @@ stages:
           echo ""
           pip list
     
-    # Install Azure Functions Core Tools
     - task: Bash@3
       displayName: 'Install Azure Functions Core Tools'
       inputs:
@@ -246,7 +232,7 @@ stages:
           func --version
           echo "✅ Azure Functions Core Tools installed"
     
-    # Code Quality Check (Optional - using flake8)
+    # ✅ FIXED: single root function_app.py (v2 model, no subfolders)
     - task: Bash@3
       displayName: 'Code Quality Check'
       inputs:
@@ -257,12 +243,10 @@ stages:
           echo "═════════════════════════════════════════════"
           pip install flake8
           cd $(functionAppPath)
-          # Check Python syntax
-          python -m py_compile OrderSender/function_app.py
-          python -m py_compile OrderProcessor/function_app.py
+          python -m py_compile function_app.py
           echo "✅ Code syntax check passed"
     
-    # Validate Function Structure
+    # ✅ FIXED: validate new single-file v2 structure
     - task: Bash@3
       displayName: 'Validate Function Structure'
       inputs:
@@ -272,35 +256,43 @@ stages:
           echo "✓ Validating Function Structure"
           echo "═════════════════════════════════════════════"
           cd $(functionAppPath)
-          
-          # Check OrderSender
-          echo "Checking OrderSender..."
-          if [ -f "OrderSender/function_app.py" ] && [ -f "OrderSender/requirements.txt" ]; then
-            echo "✅ OrderSender: All files present"
+
+          echo "Checking function_app.py..."
+          if [ -f "function_app.py" ]; then
+            echo "✅ function_app.py: Present"
           else
-            echo "❌ OrderSender: Missing files"
+            echo "❌ function_app.py: Missing"
             exit 1
           fi
-          
-          # Check OrderProcessor
-          echo "Checking OrderProcessor..."
-          if [ -f "OrderProcessor/function_app.py" ] && [ -f "OrderProcessor/requirements.txt" ]; then
-            echo "✅ OrderProcessor: All files present"
+
+          echo "Checking host.json..."
+          if [ -f "host.json" ]; then
+            echo "✅ host.json: Present"
           else
-            echo "❌ OrderProcessor: Missing files"
+            echo "❌ host.json: Missing"
             exit 1
           fi
-          
-          # Check root files
-          echo "Checking root files..."
-          if [ -f "host.json" ] && [ -f "requirements.txt" ]; then
-            echo "✅ Root files: All files present"
+
+          echo "Checking requirements.txt..."
+          if [ -f "requirements.txt" ]; then
+            echo "✅ requirements.txt: Present"
           else
-            echo "❌ Root files: Missing files"
+            echo "❌ requirements.txt: Missing"
             exit 1
           fi
+
+          echo "Confirming no conflicting function.json files..."
+          if [ ! -f "OrderSender/function.json" ] && [ ! -f "OrderProcessor/function.json" ]; then
+            echo "✅ No conflicting function.json files found"
+          else
+            echo "❌ Found function.json - remove it! v2 model uses decorators only."
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All structure checks passed"
     
-    # Create Build Artifact
+    # ✅ FIXED: copy single function_app.py instead of subfolders
     - task: Bash@3
       displayName: 'Create Build Artifact'
       inputs:
@@ -310,17 +302,14 @@ stages:
           echo "📦 Creating Build Artifact"
           echo "═════════════════════════════════════════════"
           cd $(functionAppPath)
-          # Create deployment package
           mkdir -p $(Build.ArtifactStagingDirectory)/function-app
-          cp -r OrderSender $(Build.ArtifactStagingDirectory)/function-app/
-          cp -r OrderProcessor $(Build.ArtifactStagingDirectory)/function-app/
+          cp function_app.py $(Build.ArtifactStagingDirectory)/function-app/
           cp host.json $(Build.ArtifactStagingDirectory)/function-app/
           cp requirements.txt $(Build.ArtifactStagingDirectory)/function-app/
-          
+
           echo "✅ Build artifact created"
           ls -la $(Build.ArtifactStagingDirectory)/function-app/
     
-    # Publish Build Artifact
     - task: PublishBuildArtifacts@1
       displayName: 'Publish Build Artifact'
       inputs:
@@ -336,23 +325,19 @@ stages:
     
     - checkout: self
       displayName: 'Checkout Repository'
-      path: 's/azure-service-bus'
     
-    # Setup Python
     - task: UsePythonVersion@0
       displayName: 'Setup Python $(pythonVersion)'
       inputs:
         versionSpec: '$(pythonVersion)'
         addToPath: true
     
-    # Download Build Artifact
     - task: DownloadBuildArtifacts@0
       displayName: 'Download Build Artifact'
       inputs:
         artifactName: 'function-app-build'
         downloadPath: '$(System.DefaultWorkingDirectory)/artifact'
     
-    # Deploy to Function App
     - task: AzureFunctionApp@1
       displayName: 'Deploy to Azure Function App'
       inputs:
@@ -363,7 +348,6 @@ stages:
         runtimeStack: 'PYTHON|$(pythonVersion)'
         startupCommand: ''
     
-    # Post-Deployment Verification
     - task: AzureCLI@2
       displayName: 'Post-Deployment Verification'
       inputs:
@@ -375,7 +359,6 @@ stages:
           echo "✅ POST-DEPLOYMENT VERIFICATION"
           echo "═════════════════════════════════════════════"
           
-          # Check Function App state
           echo "Checking Function App state..."
           az functionapp show \
             --name $(functionAppName) \
@@ -383,7 +366,6 @@ stages:
             --query '{Name:name, State:state, DefaultHostName:defaultHostName}' \
             -o table
           
-          # Check app settings
           echo ""
           echo "Checking App Settings..."
           az functionapp config appsettings list \
@@ -392,18 +374,14 @@ stages:
             --query '[].name' \
             -o table
           
-          # Get Function App URL
           echo ""
           echo "═════════════════════════════════════════════"
           echo "Function App URL:"
           echo "https://$(functionAppName).azurewebsites.net"
           echo "═════════════════════════════════════════════"
-          
           echo ""
           echo "✅ Deployment completed successfully!"
-          echo "Ready to test the functions"
     
-    # Test OrderSender Endpoint
     - task: Bash@3
       displayName: 'Test OrderSender Endpoint'
       inputs:
@@ -414,7 +392,6 @@ stages:
           echo "═════════════════════════════════════════════"
           
           FUNCTION_URL="https://$(functionAppName).azurewebsites.net/api/orders"
-          
           echo "Sending test request to: $FUNCTION_URL"
           echo ""
           
@@ -429,13 +406,12 @@ stages:
           
           echo "Response:"
           echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
-          
           echo ""
           echo "ℹ️  Note: If function returns error, it may still be initializing"
           echo "Wait 1-2 minutes and test again via Azure Portal"
 
 # ═══════════════════════════════════════════════════════════════
-# FINAL SUCCESS MESSAGE
+# STAGE 4: SUMMARY
 # ═══════════════════════════════════════════════════════════════
 - stage: Stage4_Summary
   displayName: '✅ Summary'
@@ -480,7 +456,5 @@ stages:
           echo ""
           echo "4. Check logs in Application Insights"
           echo ""
-          echo "📚 Documentation:"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "See CODE_GUIDE_AND_EXPLANATION.md for detailed flow and testing"
+          echo "📚 See CODE_GUIDE_AND_EXPLANATION.md for detailed flow and testing"
           echo ""
