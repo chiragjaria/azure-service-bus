@@ -20,7 +20,7 @@ variables:
   backendKey: 'servicebus.terraform.tfstate'
   # Function App
   functionAppName: 'func-sb-dev-cj'
-  functionAppPath: '$(System.DefaultWorkingDirectory)/azure-service-bus/*'
+  functionAppPath: '$(System.DefaultWorkingDirectory)/azure-service-bus'
   keyVaultName: 'kvmesdev123'
   pythonVersion: '3.10'
 
