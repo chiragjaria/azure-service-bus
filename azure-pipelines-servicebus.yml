@@ -2,28 +2,27 @@ trigger:
 - main
 
 pool:
-vmImage: ubuntu-latest
+  vmImage: ubuntu-latest
 
 variables:
-terraformVersion: '1.7.0'
-workingDir: '$(System.DefaultWorkingDirectory)/terraform'
-# Azure
-serviceConnection: 'azure-service-connection'
-resourceGroup: 'rgp-dev-mes'
-location: 'Central India'
-# Service Bus
-serviceBusNamespace: 'sb-mes-dev-cj'
-queueName: 'orders-queue'
-# Backend
-backendStorageAccount: 'tddevtfstate123'
-backendContainer: 'tfstate'
-backendKey: 'servicebus.terraform.tfstate'
-# Function App
-functionAppName: 'func-sb-dev-cj'
+  terraformVersion: '1.7.0'
+  workingDir: '$(System.DefaultWorkingDirectory)/terraform'
+  # Azure
+  serviceConnection: 'azure-service-connection'
+  resourceGroup: 'rgp-dev-mes'
+  location: 'Central India'
+  # Service Bus
+  serviceBusNamespace: 'sb-mes-dev-cj'
+  queueName: 'orders-queue'
+  # Backend
+  backendStorageAccount: 'tddevtfstate123'
+  backendContainer: 'tfstate'
+  backendKey: 'servicebus.terraform.tfstate'
+  # Function App
+  functionAppName: 'func-sb-dev-cj'
   functionAppPath: '$(System.DefaultWorkingDirectory)/azure-service-bus'
-  functionAppPath: '$(System.DefaultWorkingDirectory)/azure-service-bus/*'
-keyVaultName: 'kvmesdev123'
-pythonVersion: '3.10'
+  keyVaultName: 'kvmesdev123'
+  pythonVersion: '3.10'
 
 stages:
 
@@ -31,455 +30,455 @@ stages:
 # STAGE 1: TERRAFORM - Infrastructure Provisioning
 # ═══════════════════════════════════════════════════════════════
 - stage: Stage1_TerraformDeploy
-displayName: '1️⃣ Terraform - Service Bus Infrastructure'
-jobs:
-- job: TerraformJob
-displayName: Terraform Service Bus
-steps:
-
-- checkout: self
-displayName: 'Checkout Repository'
-
-# Install Terraform
-- task: TerraformInstaller@1
-displayName: Install Terraform $(terraformVersion)
-inputs:
-terraformVersion: $(terraformVersion)
-
-# Terraform Init
-- task: TerraformTaskV4@4
-displayName: 'Terraform Init - Initialize Backend'
-inputs:
-provider: azurerm
-command: init
-workingDirectory: $(workingDir)
-backendServiceArm: $(serviceConnection)
-backendAzureRmResourceGroupName: $(resourceGroup)
-backendAzureRmStorageAccountName: $(backendStorageAccount)
-backendAzureRmContainerName: $(backendContainer)
-backendAzureRmKey: $(backendKey)
-
-# Terraform Validate
-- task: TerraformTaskV4@4
-displayName: 'Terraform Validate - Check Syntax'
-inputs:
-provider: azurerm
-command: validate
-workingDirectory: $(workingDir)
-
-# Terraform Plan
-- task: TerraformTaskV4@4
-displayName: 'Terraform Plan - Show Changes'
-inputs:
-provider: azurerm
-command: plan
-workingDirectory: $(workingDir)
-environmentServiceNameAzureRM: $(serviceConnection)
-
-# Terraform Apply
-- task: TerraformTaskV4@4
-displayName: 'Terraform Apply - Create Resources'
-inputs:
-provider: azurerm
-command: apply
-workingDirectory: $(workingDir)
-environmentServiceNameAzureRM: $(serviceConnection)
-commandOptions: '-auto-approve'
-
-# Display Terraform Outputs
-- task: AzureCLI@2
-displayName: 'Display Terraform Outputs'
-inputs:
-azureSubscription: $(serviceConnection)
-scriptType: bash
-scriptLocation: inlineScript
-workingDirectory: $(workingDir)
-inlineScript: |
-         echo "════════════════════════════════════════════"
-         echo "✅ Terraform Outputs"
-         echo "════════════════════════════════════════════"
-         terraform output -no-color
-         echo ""
-         echo "Service Bus Namespace: $(serviceBusNamespace)"
-         echo "Queue Name: $(queueName)"
-         echo "Function App: $(functionAppName)"
+  displayName: '1️⃣ Terraform - Service Bus Infrastructure'
+  jobs:
+  - job: TerraformJob
+    displayName: Terraform Service Bus
+    steps:
+    
+    - checkout: self
+      displayName: 'Checkout Repository'
+    
+    # Install Terraform
+    - task: TerraformInstaller@1
+      displayName: Install Terraform $(terraformVersion)
+      inputs:
+        terraformVersion: $(terraformVersion)
+    
+    # Terraform Init
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Init - Initialize Backend'
+      inputs:
+        provider: azurerm
+        command: init
+        workingDirectory: $(workingDir)
+        backendServiceArm: $(serviceConnection)
+        backendAzureRmResourceGroupName: $(resourceGroup)
+        backendAzureRmStorageAccountName: $(backendStorageAccount)
+        backendAzureRmContainerName: $(backendContainer)
+        backendAzureRmKey: $(backendKey)
+    
+    # Terraform Validate
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Validate - Check Syntax'
+      inputs:
+        provider: azurerm
+        command: validate
+        workingDirectory: $(workingDir)
+    
+    # Terraform Plan
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Plan - Show Changes'
+      inputs:
+        provider: azurerm
+        command: plan
+        workingDirectory: $(workingDir)
+        environmentServiceNameAzureRM: $(serviceConnection)
+    
+    # Terraform Apply
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Apply - Create Resources'
+      inputs:
+        provider: azurerm
+        command: apply
+        workingDirectory: $(workingDir)
+        environmentServiceNameAzureRM: $(serviceConnection)
+        commandOptions: '-auto-approve'
+    
+    # Display Terraform Outputs
+    - task: AzureCLI@2
+      displayName: 'Display Terraform Outputs'
+      inputs:
+        azureSubscription: $(serviceConnection)
+        scriptType: bash
+        scriptLocation: inlineScript
+        workingDirectory: $(workingDir)
+        inlineScript: |
+          echo "════════════════════════════════════════════"
+          echo "✅ Terraform Outputs"
+          echo "════════════════════════════════════════════"
+          terraform output -no-color
+          echo ""
+          echo "Service Bus Namespace: $(serviceBusNamespace)"
+          echo "Queue Name: $(queueName)"
+          echo "Function App: $(functionAppName)"
 
 # ═══════════════════════════════════════════════════════════════
 # STAGE 2: VERIFY - Service Bus Verification
 # ═══════════════════════════════════════════════════════════════
 - stage: Stage2_Verify
-displayName: '2️⃣ Verify - Service Bus Configuration'
-dependsOn: Stage1_TerraformDeploy
-condition: succeeded()
-jobs:
-
-- job: VerifyServiceBus
-displayName: Verify Service Bus Resources
-steps:
-
-- checkout: self
-displayName: 'Checkout Repository'
-
-# Verify Service Bus Namespace
-- task: AzureCLI@2
-displayName: 'Verify Service Bus Namespace'
-inputs:
-azureSubscription: $(serviceConnection)
-scriptType: bash
-scriptLocation: inlineScript
-inlineScript: |
-         echo "═════════════════════════════════════════════"
-         echo "🔍 Checking Service Bus Namespace"
-         echo "═════════════════════════════════════════════"
-         az servicebus namespace show \
-           --name $(serviceBusNamespace) \
-           --resource-group $(resourceGroup) \
-           --query '{Name:name, Status:provisioningState, Sku:sku.name}' \
-           -o table
-         echo "✅ Service Bus Namespace verified"
-   
-# Verify Queue
-- task: AzureCLI@2
-displayName: 'Verify Service Bus Queue'
-inputs:
-azureSubscription: $(serviceConnection)
-scriptType: bash
-scriptLocation: inlineScript
-inlineScript: |
-         echo "═════════════════════════════════════════════"
-         echo "🔍 Checking Queue: $(queueName)"
-         echo "═════════════════════════════════════════════"
-         az servicebus queue show \
-           --name $(queueName) \
-           --namespace-name $(serviceBusNamespace) \
-           --resource-group $(resourceGroup) \
-           --query '{Name:name, MaxDeliveryCount:maxDeliveryCount, LockDuration:lockDuration, DefaultMessageTTL:defaultMessageTtl}' \
-           -o table
-         echo "✅ Queue verified"
-   
-# Verify Function App
-- task: AzureCLI@2
-displayName: 'Verify Function App'
-inputs:
-azureSubscription: $(serviceConnection)
-scriptType: bash
-scriptLocation: inlineScript
-inlineScript: |
-         echo "═════════════════════════════════════════════"
-         echo "🔍 Checking Function App: $(functionAppName)"
-         echo "═════════════════════════════════════════════"
-         az functionapp show \
-           --name $(functionAppName) \
-           --resource-group $(resourceGroup) \
-           --query '{Name:name, State:state, DefaultHostName:defaultHostName}' \
-           -o table
-         echo "✅ Function App verified"
-   
-# Verify Key Vault
-- task: AzureCLI@2
-displayName: 'Verify Key Vault Secrets'
-inputs:
-azureSubscription: $(serviceConnection)
-scriptType: bash
-scriptLocation: inlineScript
-inlineScript: |
-         echo "═════════════════════════════════════════════"
-         echo "🔍 Checking Key Vault Secrets"
-         echo "═════════════════════════════════════════════"
-         echo "Listed secrets in $(keyVaultName):"
-         az keyvault secret list \
-           --vault-name $(keyVaultName) \
-           --query '[].name' \
-           -o table
-         echo "✅ Key Vault verified"
+  displayName: '2️⃣ Verify - Service Bus Configuration'
+  dependsOn: Stage1_TerraformDeploy
+  condition: succeeded()
+  jobs:
+  
+  - job: VerifyServiceBus
+    displayName: Verify Service Bus Resources
+    steps:
+    
+    - checkout: self
+      displayName: 'Checkout Repository'
+    
+    # Verify Service Bus Namespace
+    - task: AzureCLI@2
+      displayName: 'Verify Service Bus Namespace'
+      inputs:
+        azureSubscription: $(serviceConnection)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          echo "═════════════════════════════════════════════"
+          echo "🔍 Checking Service Bus Namespace"
+          echo "═════════════════════════════════════════════"
+          az servicebus namespace show \
+            --name $(serviceBusNamespace) \
+            --resource-group $(resourceGroup) \
+            --query '{Name:name, Status:provisioningState, Sku:sku.name}' \
+            -o table
+          echo "✅ Service Bus Namespace verified"
+    
+    # Verify Queue
+    - task: AzureCLI@2
+      displayName: 'Verify Service Bus Queue'
+      inputs:
+        azureSubscription: $(serviceConnection)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          echo "═════════════════════════════════════════════"
+          echo "🔍 Checking Queue: $(queueName)"
+          echo "═════════════════════════════════════════════"
+          az servicebus queue show \
+            --name $(queueName) \
+            --namespace-name $(serviceBusNamespace) \
+            --resource-group $(resourceGroup) \
+            --query '{Name:name, MaxDeliveryCount:maxDeliveryCount, LockDuration:lockDuration, DefaultMessageTTL:defaultMessageTtl}' \
+            -o table
+          echo "✅ Queue verified"
+    
+    # Verify Function App
+    - task: AzureCLI@2
+      displayName: 'Verify Function App'
+      inputs:
+        azureSubscription: $(serviceConnection)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          echo "═════════════════════════════════════════════"
+          echo "🔍 Checking Function App: $(functionAppName)"
+          echo "═════════════════════════════════════════════"
+          az functionapp show \
+            --name $(functionAppName) \
+            --resource-group $(resourceGroup) \
+            --query '{Name:name, State:state, DefaultHostName:defaultHostName}' \
+            -o table
+          echo "✅ Function App verified"
+    
+    # Verify Key Vault
+    - task: AzureCLI@2
+      displayName: 'Verify Key Vault Secrets'
+      inputs:
+        azureSubscription: $(serviceConnection)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          echo "═════════════════════════════════════════════"
+          echo "🔍 Checking Key Vault Secrets"
+          echo "═════════════════════════════════════════════"
+          echo "Listed secrets in $(keyVaultName):"
+          az keyvault secret list \
+            --vault-name $(keyVaultName) \
+            --query '[].name' \
+            -o table
+          echo "✅ Key Vault verified"
 
 # ═══════════════════════════════════════════════════════════════
 # STAGE 3: CODE BUILD & DEPLOY - Function App Deployment
 # ═══════════════════════════════════════════════════════════════
 - stage: Stage3_CodeBuildDeploy
-displayName: '3️⃣ Code Build & Deploy - Function App'
-dependsOn: Stage2_Verify
-condition: succeeded()
-jobs:
-
-- job: BuildFunctionApp
-displayName: Build Function App Code
-steps:
-
-- checkout: self
-displayName: 'Checkout Repository'
-
-# Setup Python
-- task: UsePythonVersion@0
-displayName: 'Setup Python $(pythonVersion)'
-inputs:
-versionSpec: '$(pythonVersion)'
-addToPath: true
-
-# Install Dependencies
-- task: Bash@3
-displayName: 'Install Python Dependencies'
-inputs:
-targetType: 'inline'
-script: |
-         echo "═════════════════════════════════════════════"
-         echo "📦 Installing Python Dependencies"
-         echo "═════════════════════════════════════════════"
-         cd $(functionAppPath)
-         pip install --upgrade pip
-         pip install -r requirements.txt
-         echo "✅ Dependencies installed"
-         echo ""
-         pip list
-   
-# Install Azure Functions Core Tools
-- task: Bash@3
-displayName: 'Install Azure Functions Core Tools'
-inputs:
-targetType: 'inline'
-script: |
-         echo "═════════════════════════════════════════════"
-         echo "⚙️ Installing Azure Functions Core Tools"
-         echo "═════════════════════════════════════════════"
-         sudo apt-get update
-         sudo apt-get install -y azure-functions-core-tools-4
-         func --version
-         echo "✅ Azure Functions Core Tools installed"
-   
-# Code Quality Check (Optional - using flake8)
-- task: Bash@3
-displayName: 'Code Quality Check'
-inputs:
-targetType: 'inline'
-script: |
-         echo "═════════════════════════════════════════════"
-         echo "🔍 Code Quality Check"
-         echo "═════════════════════════════════════════════"
-         pip install flake8
-         cd $(functionAppPath)
-         # Check Python syntax
-         python -m py_compile OrderSender/function_app.py
-         python -m py_compile OrderProcessor/function_app.py
-         echo "✅ Code syntax check passed"
-   
-# Validate Function Structure
-- task: Bash@3
-displayName: 'Validate Function Structure'
-inputs:
-targetType: 'inline'
-script: |
-         echo "═════════════════════════════════════════════"
-         echo "✓ Validating Function Structure"
-         echo "═════════════════════════════════════════════"
-         cd $(functionAppPath)
-         
-         # Check OrderSender
-         echo "Checking OrderSender..."
-         if [ -f "OrderSender/function_app.py" ] && [ -f "OrderSender/function.json" ] && [ -f "OrderSender/requirements.txt" ]; then
-           echo "✅ OrderSender: All files present"
-         else
-           echo "❌ OrderSender: Missing files"
-           exit 1
-         fi
-         
-         # Check OrderProcessor
-         echo "Checking OrderProcessor..."
-         if [ -f "OrderProcessor/function_app.py" ] && [ -f "OrderProcessor/function.json" ] && [ -f "OrderProcessor/requirements.txt" ]; then
-           echo "✅ OrderProcessor: All files present"
-         else
-           echo "❌ OrderProcessor: Missing files"
-           exit 1
-         fi
-         
-         # Check root files
-         echo "Checking root files..."
-         if [ -f "host.json" ] && [ -f "requirements.txt" ]; then
-           echo "✅ Root files: All files present"
-         else
-           echo "❌ Root files: Missing files"
-           exit 1
-         fi
-   
-# Create Build Artifact
-- task: Bash@3
-displayName: 'Create Build Artifact'
-inputs:
-targetType: 'inline'
-script: |
-         echo "═════════════════════════════════════════════"
-         echo "📦 Creating Build Artifact"
-         echo "═════════════════════════════════════════════"
-         cd $(functionAppPath)
-         # Create deployment package
-         mkdir -p $(Build.ArtifactStagingDirectory)/function-app
-         cp -r OrderSender $(Build.ArtifactStagingDirectory)/function-app/
-         cp -r OrderProcessor $(Build.ArtifactStagingDirectory)/function-app/
-         cp host.json $(Build.ArtifactStagingDirectory)/function-app/
-         cp requirements.txt $(Build.ArtifactStagingDirectory)/function-app/
-         
-         echo "✅ Build artifact created"
-         ls -la $(Build.ArtifactStagingDirectory)/function-app/
-   
-# Publish Build Artifact
-- task: PublishBuildArtifacts@1
-displayName: 'Publish Build Artifact'
-inputs:
-pathToPublish: '$(Build.ArtifactStagingDirectory)/function-app'
-artifactName: 'function-app-build'
-publishLocation: 'Container'
-
-- job: DeployFunctionApp
-displayName: Deploy to Function App
-dependsOn: BuildFunctionApp
-condition: succeeded()
-steps:
-
-- checkout: self
-displayName: 'Checkout Repository'
-
-# Setup Python
-- task: UsePythonVersion@0
-displayName: 'Setup Python $(pythonVersion)'
-inputs:
-versionSpec: '$(pythonVersion)'
-addToPath: true
-
-# Download Build Artifact
-- task: DownloadBuildArtifacts@0
-displayName: 'Download Build Artifact'
-inputs:
-artifactName: 'function-app-build'
-downloadPath: '$(System.DefaultWorkingDirectory)/artifact'
-
-# Deploy to Function App
-- task: AzureFunctionApp@1
-displayName: 'Deploy to Azure Function App'
-inputs:
-azureSubscription: $(serviceConnection)
-appType: 'functionAppLinux'
-appName: $(functionAppName)
-package: '$(System.DefaultWorkingDirectory)/artifact/function-app-build'
-runtimeStack: 'PYTHON|$(pythonVersion)'
-startupCommand: ''
-
-# Post-Deployment Verification
-- task: AzureCLI@2
-displayName: 'Post-Deployment Verification'
-inputs:
-azureSubscription: $(serviceConnection)
-scriptType: bash
-scriptLocation: inlineScript
-inlineScript: |
-         echo "═════════════════════════════════════════════"
-         echo "✅ POST-DEPLOYMENT VERIFICATION"
-         echo "═════════════════════════════════════════════"
-         
-         # Check Function App state
-         echo "Checking Function App state..."
-         az functionapp show \
-           --name $(functionAppName) \
-           --resource-group $(resourceGroup) \
-           --query '{Name:name, State:state, DefaultHostName:defaultHostName}' \
-           -o table
-         
-         # Check app settings
-         echo ""
-         echo "Checking App Settings..."
-         az functionapp config appsettings list \
-           --name $(functionAppName) \
-           --resource-group $(resourceGroup) \
-           --query '[].name' \
-           -o table
-         
-         # Get Function App URL
-         echo ""
-         echo "═════════════════════════════════════════════"
-         echo "Function App URL:"
-         echo "https://$(functionAppName).azurewebsites.net"
-         echo "═════════════════════════════════════════════"
-         
-         echo ""
-         echo "✅ Deployment completed successfully!"
-         echo "Ready to test the functions"
-   
-# Test OrderSender Endpoint
-- task: Bash@3
-displayName: 'Test OrderSender Endpoint'
-inputs:
-targetType: 'inline'
-script: |
-         echo "═════════════════════════════════════════════"
-         echo "🧪 Testing OrderSender Endpoint"
-         echo "═════════════════════════════════════════════"
-         
-         FUNCTION_URL="https://$(functionAppName).azurewebsites.net/api/orders"
-         
-         echo "Sending test request to: $FUNCTION_URL"
-         echo ""
-         
-         RESPONSE=$(curl -s -X POST "$FUNCTION_URL" \
-           -H "Content-Type: application/json" \
-           -d '{
-             "order_id": 1,
-             "customer_name": "Test Customer",
-             "items": ["item1", "item2"],
-             "total_amount": 100
-           }')
-         
-         echo "Response:"
-         echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
-         
-         echo ""
-         echo "ℹ️  Note: If function returns error, it may still be initializing"
-         echo "Wait 1-2 minutes and test again via Azure Portal"
+  displayName: '3️⃣ Code Build & Deploy - Function App'
+  dependsOn: Stage2_Verify
+  condition: succeeded()
+  jobs:
+  
+  - job: BuildFunctionApp
+    displayName: Build Function App Code
+    steps:
+    
+    - checkout: self
+      displayName: 'Checkout Repository'
+    
+    # Setup Python
+    - task: UsePythonVersion@0
+      displayName: 'Setup Python $(pythonVersion)'
+      inputs:
+        versionSpec: '$(pythonVersion)'
+        addToPath: true
+    
+    # Install Dependencies
+    - task: Bash@3
+      displayName: 'Install Python Dependencies'
+      inputs:
+        targetType: 'inline'
+        script: |
+          echo "═════════════════════════════════════════════"
+          echo "📦 Installing Python Dependencies"
+          echo "═════════════════════════════════════════════"
+          cd $(functionAppPath)
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          echo "✅ Dependencies installed"
+          echo ""
+          pip list
+    
+    # Install Azure Functions Core Tools
+    - task: Bash@3
+      displayName: 'Install Azure Functions Core Tools'
+      inputs:
+        targetType: 'inline'
+        script: |
+          echo "═════════════════════════════════════════════"
+          echo "⚙️ Installing Azure Functions Core Tools"
+          echo "═════════════════════════════════════════════"
+          sudo apt-get update
+          sudo apt-get install -y azure-functions-core-tools-4
+          func --version
+          echo "✅ Azure Functions Core Tools installed"
+    
+    # Code Quality Check (Optional - using flake8)
+    - task: Bash@3
+      displayName: 'Code Quality Check'
+      inputs:
+        targetType: 'inline'
+        script: |
+          echo "═════════════════════════════════════════════"
+          echo "🔍 Code Quality Check"
+          echo "═════════════════════════════════════════════"
+          pip install flake8
+          cd $(functionAppPath)
+          # Check Python syntax
+          python -m py_compile OrderSender/function_app.py
+          python -m py_compile OrderProcessor/function_app.py
+          echo "✅ Code syntax check passed"
+    
+    # Validate Function Structure
+    - task: Bash@3
+      displayName: 'Validate Function Structure'
+      inputs:
+        targetType: 'inline'
+        script: |
+          echo "═════════════════════════════════════════════"
+          echo "✓ Validating Function Structure"
+          echo "═════════════════════════════════════════════"
+          cd $(functionAppPath)
+          
+          # Check OrderSender
+          echo "Checking OrderSender..."
+          if [ -f "OrderSender/function_app.py" ] && [ -f "OrderSender/function.json" ] && [ -f "OrderSender/requirements.txt" ]; then
+            echo "✅ OrderSender: All files present"
+          else
+            echo "❌ OrderSender: Missing files"
+            exit 1
+          fi
+          
+          # Check OrderProcessor
+          echo "Checking OrderProcessor..."
+          if [ -f "OrderProcessor/function_app.py" ] && [ -f "OrderProcessor/function.json" ] && [ -f "OrderProcessor/requirements.txt" ]; then
+            echo "✅ OrderProcessor: All files present"
+          else
+            echo "❌ OrderProcessor: Missing files"
+            exit 1
+          fi
+          
+          # Check root files
+          echo "Checking root files..."
+          if [ -f "host.json" ] && [ -f "requirements.txt" ]; then
+            echo "✅ Root files: All files present"
+          else
+            echo "❌ Root files: Missing files"
+            exit 1
+          fi
+    
+    # Create Build Artifact
+    - task: Bash@3
+      displayName: 'Create Build Artifact'
+      inputs:
+        targetType: 'inline'
+        script: |
+          echo "═════════════════════════════════════════════"
+          echo "📦 Creating Build Artifact"
+          echo "═════════════════════════════════════════════"
+          cd $(functionAppPath)
+          # Create deployment package
+          mkdir -p $(Build.ArtifactStagingDirectory)/function-app
+          cp -r OrderSender $(Build.ArtifactStagingDirectory)/function-app/
+          cp -r OrderProcessor $(Build.ArtifactStagingDirectory)/function-app/
+          cp host.json $(Build.ArtifactStagingDirectory)/function-app/
+          cp requirements.txt $(Build.ArtifactStagingDirectory)/function-app/
+          
+          echo "✅ Build artifact created"
+          ls -la $(Build.ArtifactStagingDirectory)/function-app/
+    
+    # Publish Build Artifact
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Build Artifact'
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)/function-app'
+        artifactName: 'function-app-build'
+        publishLocation: 'Container'
+  
+  - job: DeployFunctionApp
+    displayName: Deploy to Function App
+    dependsOn: BuildFunctionApp
+    condition: succeeded()
+    steps:
+    
+    - checkout: self
+      displayName: 'Checkout Repository'
+    
+    # Setup Python
+    - task: UsePythonVersion@0
+      displayName: 'Setup Python $(pythonVersion)'
+      inputs:
+        versionSpec: '$(pythonVersion)'
+        addToPath: true
+    
+    # Download Build Artifact
+    - task: DownloadBuildArtifacts@0
+      displayName: 'Download Build Artifact'
+      inputs:
+        artifactName: 'function-app-build'
+        downloadPath: '$(System.DefaultWorkingDirectory)/artifact'
+    
+    # Deploy to Function App
+    - task: AzureFunctionApp@1
+      displayName: 'Deploy to Azure Function App'
+      inputs:
+        azureSubscription: $(serviceConnection)
+        appType: 'functionAppLinux'
+        appName: $(functionAppName)
+        package: '$(System.DefaultWorkingDirectory)/artifact/function-app-build'
+        runtimeStack: 'PYTHON|$(pythonVersion)'
+        startupCommand: ''
+    
+    # Post-Deployment Verification
+    - task: AzureCLI@2
+      displayName: 'Post-Deployment Verification'
+      inputs:
+        azureSubscription: $(serviceConnection)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          echo "═════════════════════════════════════════════"
+          echo "✅ POST-DEPLOYMENT VERIFICATION"
+          echo "═════════════════════════════════════════════"
+          
+          # Check Function App state
+          echo "Checking Function App state..."
+          az functionapp show \
+            --name $(functionAppName) \
+            --resource-group $(resourceGroup) \
+            --query '{Name:name, State:state, DefaultHostName:defaultHostName}' \
+            -o table
+          
+          # Check app settings
+          echo ""
+          echo "Checking App Settings..."
+          az functionapp config appsettings list \
+            --name $(functionAppName) \
+            --resource-group $(resourceGroup) \
+            --query '[].name' \
+            -o table
+          
+          # Get Function App URL
+          echo ""
+          echo "═════════════════════════════════════════════"
+          echo "Function App URL:"
+          echo "https://$(functionAppName).azurewebsites.net"
+          echo "═════════════════════════════════════════════"
+          
+          echo ""
+          echo "✅ Deployment completed successfully!"
+          echo "Ready to test the functions"
+    
+    # Test OrderSender Endpoint
+    - task: Bash@3
+      displayName: 'Test OrderSender Endpoint'
+      inputs:
+        targetType: 'inline'
+        script: |
+          echo "═════════════════════════════════════════════"
+          echo "🧪 Testing OrderSender Endpoint"
+          echo "═════════════════════════════════════════════"
+          
+          FUNCTION_URL="https://$(functionAppName).azurewebsites.net/api/orders"
+          
+          echo "Sending test request to: $FUNCTION_URL"
+          echo ""
+          
+          RESPONSE=$(curl -s -X POST "$FUNCTION_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "order_id": 1,
+              "customer_name": "Test Customer",
+              "items": ["item1", "item2"],
+              "total_amount": 100
+            }')
+          
+          echo "Response:"
+          echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
+          
+          echo ""
+          echo "ℹ️  Note: If function returns error, it may still be initializing"
+          echo "Wait 1-2 minutes and test again via Azure Portal"
 
 # ═══════════════════════════════════════════════════════════════
 # FINAL SUCCESS MESSAGE
 # ═══════════════════════════════════════════════════════════════
 - stage: Stage4_Summary
-displayName: '✅ Summary'
-dependsOn: 
-- Stage1_TerraformDeploy
-- Stage2_Verify
-- Stage3_CodeBuildDeploy
-condition: succeeded()
-jobs:
-- job: SuccessJob
-displayName: Deployment Summary
-steps:
-
-- task: Bash@3
-displayName: 'Deployment Success Summary'
-inputs:
-targetType: 'inline'
-script: |
-         echo ""
-         echo "╔════════════════════════════════════════════════════════════╗"
-         echo "║        🎉 DEPLOYMENT COMPLETED SUCCESSFULLY 🎉            ║"
-         echo "╚════════════════════════════════════════════════════════════╝"
-         echo ""
-         echo "📊 What was deployed:"
-         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-         echo "✅ Service Bus Namespace: $(serviceBusNamespace)"
-         echo "✅ Queue: $(queueName)"
-         echo "✅ Function App: $(functionAppName)"
-         echo "✅ OrderSender Function (HTTP Trigger)"
-         echo "✅ OrderProcessor Function (Queue Trigger)"
-         echo ""
-         echo "🧪 Next Steps:"
-         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-         echo "1. Test OrderSender endpoint:"
-         echo "   curl -X POST https://$(functionAppName).azurewebsites.net/api/orders \\"
-         echo "     -H 'Content-Type: application/json' \\"
-         echo "     -d '{\"order_id\": 1, \"customer_name\": \"John\", \"items\": [\"pizza\"]}'"
-         echo ""
-         echo "2. Check Service Bus queue in Azure Portal"
-         echo ""
-         echo "3. Verify order saved in PostgreSQL"
-         echo ""
-         echo "4. Check logs in Application Insights"
-         echo ""
-         echo "📚 Documentation:"
-         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-         echo "See CODE_GUIDE_AND_EXPLANATION.md for detailed flow and testing"
-         echo ""
+  displayName: '✅ Summary'
+  dependsOn: 
+    - Stage1_TerraformDeploy
+    - Stage2_Verify
+    - Stage3_CodeBuildDeploy
+  condition: succeeded()
+  jobs:
+  - job: SuccessJob
+    displayName: Deployment Summary
+    steps:
+    
+    - task: Bash@3
+      displayName: 'Deployment Success Summary'
+      inputs:
+        targetType: 'inline'
+        script: |
+          echo ""
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║        🎉 DEPLOYMENT COMPLETED SUCCESSFULLY 🎉            ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "📊 What was deployed:"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Service Bus Namespace: $(serviceBusNamespace)"
+          echo "✅ Queue: $(queueName)"
+          echo "✅ Function App: $(functionAppName)"
+          echo "✅ OrderSender Function (HTTP Trigger)"
+          echo "✅ OrderProcessor Function (Queue Trigger)"
+          echo ""
+          echo "🧪 Next Steps:"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "1. Test OrderSender endpoint:"
+          echo "   curl -X POST https://$(functionAppName).azurewebsites.net/api/orders \\"
+          echo "     -H 'Content-Type: application/json' \\"
+          echo "     -d '{\"order_id\": 1, \"customer_name\": \"John\", \"items\": [\"pizza\"]}'"
+          echo ""
+          echo "2. Check Service Bus queue in Azure Portal"
+          echo ""
+          echo "3. Verify order saved in PostgreSQL"
+          echo ""
+          echo "4. Check logs in Application Insights"
+          echo ""
+          echo "📚 Documentation:"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "See CODE_GUIDE_AND_EXPLANATION.md for detailed flow and testing"
+          echo ""
