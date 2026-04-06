@@ -336,6 +336,7 @@ stages:
     
     - checkout: self
       displayName: 'Checkout Repository'
+      path: 's/azure-service-bus'
     
     # Setup Python
     - task: UsePythonVersion@0
