@@ -26,7 +26,7 @@ app = func.FunctionApp()
 # ══════════════════════════════════════════════════════════════════════
 
 @app.function_name("OrderSender")
-@app.route(route="orders", methods=["POST"])
+@app.route(route="orders", methods=["POST"],auth_level=func.AuthLevel.ANONYMOUS)
 def order_sender(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
