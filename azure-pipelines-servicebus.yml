@@ -20,7 +20,7 @@ variables:
   backendKey: 'servicebus.terraform.tfstate'
   # Function App
   functionAppName: 'func-sb-dev-cj'
-  functionAppPath: '$(System.DefaultWorkingDirectory)'    # ✅ FIXED: repo root is the function app root
+  functionAppPath: '$(System.DefaultWorkingDirectory)'   # ✅ repo root IS the function app root
   keyVaultName: 'kvmesdev123'
   pythonVersion: '3.10'
 
@@ -35,15 +35,15 @@ stages:
   - job: TerraformJob
     displayName: Terraform Service Bus
     steps:
-    
+
     - checkout: self
       displayName: 'Checkout Repository'
-    
+
     - task: TerraformInstaller@1
       displayName: Install Terraform $(terraformVersion)
       inputs:
         terraformVersion: $(terraformVersion)
-    
+
     - task: TerraformTaskV4@4
       displayName: 'Terraform Init - Initialize Backend'
       inputs:
@@ -55,14 +55,14 @@ stages:
         backendAzureRmStorageAccountName: $(backendStorageAccount)
         backendAzureRmContainerName: $(backendContainer)
         backendAzureRmKey: $(backendKey)
-    
+
     - task: TerraformTaskV4@4
       displayName: 'Terraform Validate - Check Syntax'
       inputs:
         provider: azurerm
         command: validate
         workingDirectory: $(workingDir)
-    
+
     - task: TerraformTaskV4@4
       displayName: 'Terraform Plan - Show Changes'
       inputs:
@@ -70,7 +70,7 @@ stages:
         command: plan
         workingDirectory: $(workingDir)
         environmentServiceNameAzureRM: $(serviceConnection)
-    
+
     - task: TerraformTaskV4@4
       displayName: 'Terraform Apply - Create Resources'
       inputs:
@@ -79,7 +79,7 @@ stages:
         workingDirectory: $(workingDir)
         environmentServiceNameAzureRM: $(serviceConnection)
         commandOptions: '-auto-approve'
-    
+
     - task: AzureCLI@2
       displayName: 'Display Terraform Outputs'
       inputs:
@@ -105,14 +105,14 @@ stages:
   dependsOn: Stage1_TerraformDeploy
   condition: succeeded()
   jobs:
-  
+
   - job: VerifyServiceBus
     displayName: Verify Service Bus Resources
     steps:
-    
+
     - checkout: self
       displayName: 'Checkout Repository'
-    
+
     - task: AzureCLI@2
       displayName: 'Verify Service Bus Namespace'
       inputs:
@@ -129,7 +129,7 @@ stages:
             --query '{Name:name, Status:provisioningState, Sku:sku.name}' \
             -o table
           echo "✅ Service Bus Namespace verified"
-    
+
     - task: AzureCLI@2
       displayName: 'Verify Service Bus Queue'
       inputs:
@@ -147,7 +147,7 @@ stages:
             --query '{Name:name, MaxDeliveryCount:maxDeliveryCount, LockDuration:lockDuration, DefaultMessageTTL:defaultMessageTtl}' \
             -o table
           echo "✅ Queue verified"
-    
+
     - task: AzureCLI@2
       displayName: 'Verify Function App'
       inputs:
@@ -164,7 +164,7 @@ stages:
             --query '{Name:name, State:state, DefaultHostName:defaultHostName}' \
             -o table
           echo "✅ Function App verified"
-    
+
     - task: AzureCLI@2
       displayName: 'Verify Key Vault Secrets'
       inputs:
@@ -190,63 +190,21 @@ stages:
   dependsOn: Stage2_Verify
   condition: succeeded()
   jobs:
-  
-  - job: BuildFunctionApp
-    displayName: Build Function App Code
+
+  - job: BuildAndDeployFunctionApp
+    displayName: Build and Deploy Function App
     steps:
-    
+
     - checkout: self
       displayName: 'Checkout Repository'
-    
+
     - task: UsePythonVersion@0
       displayName: 'Setup Python $(pythonVersion)'
       inputs:
         versionSpec: '$(pythonVersion)'
         addToPath: true
-    
-    - task: Bash@3
-      displayName: 'Install Python Dependencies'
-      inputs:
-        targetType: 'inline'
-        script: |
-          echo "═════════════════════════════════════════════"
-          echo "📦 Installing Python Dependencies"
-          echo "═════════════════════════════════════════════"
-          cd $(functionAppPath)
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          echo "✅ Dependencies installed"
-          echo ""
-          pip list
-    
-    - task: Bash@3
-      displayName: 'Install Azure Functions Core Tools'
-      inputs:
-        targetType: 'inline'
-        script: |
-          echo "═════════════════════════════════════════════"
-          echo "⚙️ Installing Azure Functions Core Tools"
-          echo "═════════════════════════════════════════════"
-          sudo apt-get update
-          sudo apt-get install -y azure-functions-core-tools-4
-          func --version
-          echo "✅ Azure Functions Core Tools installed"
-    
-    # ✅ FIXED: single root function_app.py (v2 model, no subfolders)
-    - task: Bash@3
-      displayName: 'Code Quality Check'
-      inputs:
-        targetType: 'inline'
-        script: |
-          echo "═════════════════════════════════════════════"
-          echo "🔍 Code Quality Check"
-          echo "═════════════════════════════════════════════"
-          pip install flake8
-          cd $(functionAppPath)
-          python -m py_compile function_app.py
-          echo "✅ Code syntax check passed"
-    
-    # ✅ FIXED: validate new single-file v2 structure
+
+    # ✅ Validate structure first (v2 model - single root function_app.py)
     - task: Bash@3
       displayName: 'Validate Function Structure'
       inputs:
@@ -257,15 +215,16 @@ stages:
           echo "═════════════════════════════════════════════"
           cd $(functionAppPath)
 
-          echo "Checking function_app.py..."
+          echo "Workspace contents:"
+          ls -la
+
           if [ -f "function_app.py" ]; then
             echo "✅ function_app.py: Present"
           else
-            echo "❌ function_app.py: Missing"
+            echo "❌ function_app.py: Missing - make sure it is at the repo root"
             exit 1
           fi
 
-          echo "Checking host.json..."
           if [ -f "host.json" ]; then
             echo "✅ host.json: Present"
           else
@@ -273,7 +232,6 @@ stages:
             exit 1
           fi
 
-          echo "Checking requirements.txt..."
           if [ -f "requirements.txt" ]; then
             echo "✅ requirements.txt: Present"
           else
@@ -281,73 +239,72 @@ stages:
             exit 1
           fi
 
-          echo "Confirming no conflicting function.json files..."
-          if [ ! -f "OrderSender/function.json" ] && [ ! -f "OrderProcessor/function.json" ]; then
-            echo "✅ No conflicting function.json files found"
-          else
-            echo "❌ Found function.json - remove it! v2 model uses decorators only."
+          if [ -f "OrderSender/function.json" ] || [ -f "OrderProcessor/function.json" ]; then
+            echo "❌ Found function.json - delete it! v2 model uses decorators only."
             exit 1
+          else
+            echo "✅ No conflicting function.json files"
           fi
 
           echo ""
           echo "✅ All structure checks passed"
-    
-    # ✅ FIXED: copy single function_app.py instead of subfolders
+
+    # ✅ Code syntax check
     - task: Bash@3
-      displayName: 'Create Build Artifact'
+      displayName: 'Code Quality Check'
       inputs:
         targetType: 'inline'
         script: |
           echo "═════════════════════════════════════════════"
-          echo "📦 Creating Build Artifact"
+          echo "🔍 Code Quality Check"
           echo "═════════════════════════════════════════════"
           cd $(functionAppPath)
-          mkdir -p $(Build.ArtifactStagingDirectory)/function-app
-          cp function_app.py $(Build.ArtifactStagingDirectory)/function-app/
-          cp host.json $(Build.ArtifactStagingDirectory)/function-app/
-          cp requirements.txt $(Build.ArtifactStagingDirectory)/function-app/
+          python -m py_compile function_app.py
+          echo "✅ Code syntax check passed"
 
-          echo "✅ Build artifact created"
-          ls -la $(Build.ArtifactStagingDirectory)/function-app/
-    
-    - task: PublishBuildArtifacts@1
-      displayName: 'Publish Build Artifact'
+    # ✅ FIXED: Build zip package with dependencies installed inside it
+    # This is required for Linux Consumption/Premium plans
+    - task: Bash@3
+      displayName: 'Build Deployment Package (ZIP with dependencies)'
       inputs:
-        pathToPublish: '$(Build.ArtifactStagingDirectory)/function-app'
-        artifactName: 'function-app-build'
-        publishLocation: 'Container'
-  
-  - job: DeployFunctionApp
-    displayName: Deploy to Function App
-    dependsOn: BuildFunctionApp
-    condition: succeeded()
-    steps:
-    
-    - checkout: self
-      displayName: 'Checkout Repository'
-    
-    - task: UsePythonVersion@0
-      displayName: 'Setup Python $(pythonVersion)'
-      inputs:
-        versionSpec: '$(pythonVersion)'
-        addToPath: true
-    
-    - task: DownloadBuildArtifacts@0
-      displayName: 'Download Build Artifact'
-      inputs:
-        artifactName: 'function-app-build'
-        downloadPath: '$(System.DefaultWorkingDirectory)/artifact'
-    
-    - task: AzureFunctionApp@1
+        targetType: 'inline'
+        script: |
+          echo "═════════════════════════════════════════════"
+          echo "📦 Building Deployment Package"
+          echo "═════════════════════════════════════════════"
+
+          DEPLOY_DIR="$(Build.ArtifactStagingDirectory)/function-app"
+          mkdir -p "$DEPLOY_DIR"
+
+          # Copy function app files
+          cp $(functionAppPath)/function_app.py "$DEPLOY_DIR/"
+          cp $(functionAppPath)/host.json "$DEPLOY_DIR/"
+          cp $(functionAppPath)/requirements.txt "$DEPLOY_DIR/"
+
+          # ✅ Install dependencies INTO the package folder
+          pip install \
+            --target "$DEPLOY_DIR/.python_packages/lib/site-packages" \
+            --no-cache-dir \
+            -r $(functionAppPath)/requirements.txt
+
+          echo ""
+          echo "Package contents:"
+          ls -la "$DEPLOY_DIR/"
+          echo ""
+          echo "✅ Deployment package built with dependencies"
+
+    # ✅ Deploy using zip deploy method (most reliable for Linux)
+    - task: AzureFunctionApp@2
       displayName: 'Deploy to Azure Function App'
       inputs:
-        azureSubscription: $(serviceConnection)
+        connectedServiceNameARM: $(serviceConnection)
         appType: 'functionAppLinux'
         appName: $(functionAppName)
-        package: '$(System.DefaultWorkingDirectory)/artifact/function-app-build'
+        package: '$(Build.ArtifactStagingDirectory)/function-app'
         runtimeStack: 'PYTHON|$(pythonVersion)'
-        startupCommand: ''
-    
+        deploymentMethod: 'zipDeploy'
+
+    # Post-Deployment Verification
     - task: AzureCLI@2
       displayName: 'Post-Deployment Verification'
       inputs:
@@ -358,30 +315,31 @@ stages:
           echo "═════════════════════════════════════════════"
           echo "✅ POST-DEPLOYMENT VERIFICATION"
           echo "═════════════════════════════════════════════"
-          
+
           echo "Checking Function App state..."
           az functionapp show \
             --name $(functionAppName) \
             --resource-group $(resourceGroup) \
             --query '{Name:name, State:state, DefaultHostName:defaultHostName}' \
             -o table
-          
+
           echo ""
-          echo "Checking App Settings..."
-          az functionapp config appsettings list \
+          echo "Checking registered functions..."
+          az functionapp function list \
             --name $(functionAppName) \
             --resource-group $(resourceGroup) \
-            --query '[].name' \
+            --query '[].{Name:name, Language:language}' \
             -o table
-          
+
           echo ""
           echo "═════════════════════════════════════════════"
           echo "Function App URL:"
           echo "https://$(functionAppName).azurewebsites.net"
           echo "═════════════════════════════════════════════"
           echo ""
-          echo "✅ Deployment completed successfully!"
-    
+          echo "✅ Deployment completed!"
+
+    # Test endpoint
     - task: Bash@3
       displayName: 'Test OrderSender Endpoint'
       inputs:
@@ -390,12 +348,16 @@ stages:
           echo "═════════════════════════════════════════════"
           echo "🧪 Testing OrderSender Endpoint"
           echo "═════════════════════════════════════════════"
-          
+
+          # Wait for function app to fully start
+          echo "Waiting 30 seconds for function app to initialize..."
+          sleep 30
+
           FUNCTION_URL="https://$(functionAppName).azurewebsites.net/api/orders"
           echo "Sending test request to: $FUNCTION_URL"
           echo ""
-          
-          RESPONSE=$(curl -s -X POST "$FUNCTION_URL" \
+
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$FUNCTION_URL" \
             -H "Content-Type: application/json" \
             -d '{
               "order_id": 1,
@@ -403,19 +365,20 @@ stages:
               "items": ["item1", "item2"],
               "total_amount": 100
             }')
-          
-          echo "Response:"
-          echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
-          echo ""
-          echo "ℹ️  Note: If function returns error, it may still be initializing"
-          echo "Wait 1-2 minutes and test again via Azure Portal"
+
+          HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS" | cut -d: -f2)
+          BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS")
+
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Response Body:"
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
 
 # ═══════════════════════════════════════════════════════════════
 # STAGE 4: SUMMARY
 # ═══════════════════════════════════════════════════════════════
 - stage: Stage4_Summary
   displayName: '✅ Summary'
-  dependsOn: 
+  dependsOn:
     - Stage1_TerraformDeploy
     - Stage2_Verify
     - Stage3_CodeBuildDeploy
@@ -424,7 +387,7 @@ stages:
   - job: SuccessJob
     displayName: Deployment Summary
     steps:
-    
+
     - task: Bash@3
       displayName: 'Deployment Success Summary'
       inputs:
@@ -443,18 +406,9 @@ stages:
           echo "✅ OrderSender Function (HTTP Trigger)"
           echo "✅ OrderProcessor Function (Queue Trigger)"
           echo ""
-          echo "🧪 Next Steps:"
+          echo "🧪 Test command:"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "1. Test OrderSender endpoint:"
-          echo "   curl -X POST https://$(functionAppName).azurewebsites.net/api/orders \\"
-          echo "     -H 'Content-Type: application/json' \\"
-          echo "     -d '{\"order_id\": 1, \"customer_name\": \"John\", \"items\": [\"pizza\"]}'"
-          echo ""
-          echo "2. Check Service Bus queue in Azure Portal"
-          echo ""
-          echo "3. Verify order saved in PostgreSQL"
-          echo ""
-          echo "4. Check logs in Application Insights"
-          echo ""
-          echo "📚 See CODE_GUIDE_AND_EXPLANATION.md for detailed flow and testing"
+          echo "curl -X POST https://$(functionAppName).azurewebsites.net/api/orders \\"
+          echo "  -H 'Content-Type: application/json' \\"
+          echo "  -d '{\"order_id\": 1, \"customer_name\": \"John\", \"items\": [\"pizza\"]}'"
           echo ""
